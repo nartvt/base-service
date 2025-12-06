@@ -1,0 +1,249 @@
+basePath: /api
+definitions:
+  common.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  common.Response:
+    properties:
+      code:
+        type: string
+      data: {}
+      msg:
+        type: string
+      pagination:
+        $ref: '#/definitions/common.Pagination'
+    type: object
+  middleware.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      token_type:
+        type: string
+    type: object
+  request.LoginRequest:
+    properties:
+      password:
+        type: string
+      username_email:
+        type: string
+    type: object
+  request.RegisterRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      user_name:
+        type: string
+    type: object
+  response.LoginResponse:
+    properties:
+      refresh_token:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/response.UserResponse'
+    type: object
+  response.ProfileResponse:
+    properties:
+      active:
+        type: boolean
+      avatar:
+        type: string
+      created_at:
+        type: integer
+      description:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      tier:
+        $ref: '#/definitions/response.ProfileTierResponse'
+      updated_at:
+        type: integer
+      username:
+        type: string
+    type: object
+  response.ProfileTierResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: integer
+      id:
+        type: integer
+    type: object
+  response.RegisterResponse:
+    properties:
+      profile:
+        $ref: '#/definitions/response.ProfileResponse'
+      refresh_token:
+        type: string
+      token:
+        type: string
+    type: object
+  response.UserResponse:
+    properties:
+      created_at:
+        type: integer
+      email:
+        type: string
+      first_name:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: integer
+      username:
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact:
+    email: support@baseservice.io
+    name: API Support
+  description: API documentation for Base Service
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Base Service API
+  version: "1.0"
+paths:
+  /v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Login user with username and password in the system
+      parameters:
+      - description: Login request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response or Fail response. Code can be 'SUCCESS'
+            or 'ERROR'.
+          schema:
+            allOf:
+            - $ref: '#/definitions/common.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.LoginResponse'
+              type: object
+      summary: Login user with username and password
+      tags:
+      - Auth
+  /v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh user token
+      parameters:
+      - description: Refresh token
+        in: header
+        name: RefreshToken
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response or Fail response. Code can be 'SUCCESS'
+            or 'ERROR'.
+          schema:
+            allOf:
+            - $ref: '#/definitions/common.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/middleware.TokenPair'
+              type: object
+      summary: Refresh user token
+      tags:
+      - Auth
+  /v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account and return JWT tokens
+      parameters:
+      - description: Registration credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response or Fail response. Code can be 'SUCCESS'
+            or 'ERROR'.
+          schema:
+            allOf:
+            - $ref: '#/definitions/common.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.RegisterResponse'
+              type: object
+      summary: Register new user
+      tags:
+      - Auth
+  /v1/user/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get user profile
+      parameters:
+      - description: Bearer authorization token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response or Fail response. Code can be 'SUCCESS'
+            or 'ERROR'.
+          schema:
+            allOf:
+            - $ref: '#/definitions/common.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ProfileResponse'
+              type: object
+      summary: Get user profile
+      tags:
+      - Users
+swagger: "2.0"

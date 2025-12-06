@@ -1,5 +1,0 @@
-package midleware
-
-func init() {
-
-}

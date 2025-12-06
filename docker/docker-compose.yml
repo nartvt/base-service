@@ -1,0 +1,33 @@
+version: "3.1"
+
+# https://hub.docker.com/r/bitnami/redis-sentinel/
+services:
+  redis:
+    image: "bitnami/redis:latest"
+    platform: linux/amd64
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - ALLOW_EMPTY_PASSWORD=yes
+      - cluster-enabled=yes
+    networks:
+      - base-service-net
+    volumes:
+      - ./redis-conf:/opt/bitnami/redis/etc
+    ports:
+      - "6379:6379"
+  postgres:
+    image: "postgres:18"
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=orders
+      - POSTGRES_INITDB_ARGS="--encoding=UTF-8"
+    ports:
+      - 5432:5432
+    user: root
+    networks:
+      - base-service-net
+
+networks:
+  base-service-net:
+    driver: bridge

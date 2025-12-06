@@ -1,7 +1,26 @@
-package controller
+package route
 
-import "log/slog"
+import (
+	"base-service/config"
+	"base-service/internal/infra"
+	"base-service/internal/middleware"
 
-func init() {
-	slog.Info("Init route")
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisClient) {
+	httpClient := infra.HttpServer{
+		AppName: cf.Server.Http.AppName,
+		Conf:    &cf.Server.Http,
+		CORS:    &cf.Middleware,
+	}
+	httpClient.InitHttpServer()
+	jwtCache := middleware.NewJWTCache(redisClient.Redis(), true)
+	auth := middleware.NewAuthenHandler(cf.Middleware, jwtCache)
+
+	apiv1 := httpClient.App().Group("/api/v1")
+	SetupUserRoute(apiv1, auth, pool, cf)
+
+	// Print only API routes (not middleware routes)
+	httpClient.Start()
 }

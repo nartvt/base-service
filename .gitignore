@@ -1,1 +1,45 @@
 .env
+vendor
+.DS_Store
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.idea
+.vscode
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# Go Modules
+go.sum
+go.mod
+
+.*
+*.md
+!README.md
+base-service
+# Go binary (file server bạn build ra)
+server
+server.exe
+
+!FINAL_CODE_REVIEW.md

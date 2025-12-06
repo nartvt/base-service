@@ -1,0 +1,80 @@
+server:
+  profile: local
+  http:
+    appName: base-service
+    port: 8081
+    enableTLS: false
+    readTimeout: 10000
+    writeTimeout: 10000
+  grpc:
+    port: 9081
+    enableTLS: false
+    readTimeout: 10000
+    writeTimeout: 10000
+log:
+  level: -4
+  jsonOutput: false
+  addSource: true
+middleware:
+  token:
+    passwordSalt: secret
+    accessTokenSecret: secret
+    accessTokenExp: 10m # 10 minutes
+    refreshTokenSecret: refreshSecret
+    refreshTokenExp: 24h # 24 hours
+  cors:
+    allowedOrigins:
+      - "http://localhost:3000"      # React/Vue/Angular dev server
+      - "http://localhost:5173"      # Vite dev server
+      - "http://localhost:8080"      # Alternative frontend port
+    allowedMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+      - "PATCH"
+    allowedHeaders:
+      - "Origin"
+      - "Content-Type"
+      - "Accept"
+      - "Authorization"
+      - "X-Language"
+      - "X-Request-ID"
+    exposedHeaders:
+      - "X-Request-ID"
+    allowCredentials: true
+    maxAge: 86400
+  rateLimit:
+    # General API rate limiting
+    enabled: false                    # Enable/disable rate limiting
+    max: 10                         # Max requests per window
+    expiration: 1m                   # Time window (1 minute)
+    skipFailedReq: false             # Count failed requests
+    skipSuccessReq: false            # Count successful requests
+    limitReached: "Too many requests, please try again later."
+    #Authentication endpoint rate limiting (stricter)
+    authEnabled: true                # Enable/disable auth rate limiting
+    authMax: 5                       # Max login attempts per window
+    authExpiration: 1m               # Time window (1 minute)
+database:
+  driverName: postgres
+  host: localhost
+  port: 5432
+  userName: postgres
+  password: root
+  dbName: orders
+  sslMode: disable
+  maxOpenConnections: 10
+  maxIdleConnections: 10
+  maxConnLifetime: 10s
+  maxConnIdleTime: 10s
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  maxIdle: 10
+  dialTimeout: 10s
+  readTimeout: 10s
+  writeTimeout: 10s
