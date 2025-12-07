@@ -85,7 +85,7 @@ func NewRedisStorage(redisClient *goredis.Client, rediscf *config.RedisConfig, r
 		Host:     rediscf.Host,
 		Port:     rediscf.Port, // Port is included in Addr
 		Database: rateLimitConfig.RedisDB,
-		Reset:    true,
+		Reset:    false,
 	})
 	slog.Info("Using distributed auth rate limiting (Redis)",
 		"redis_db", rateLimitConfig.RedisDB,

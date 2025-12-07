@@ -124,7 +124,7 @@ func (r *HttpServer) App() *fiber.App {
 func (r *HttpServer) ConfigFiber(conf *config.ServerInfo) fiber.Config {
 	return fiber.Config{
 		AppName:               conf.AppName,
-		EnablePrintRoutes:     true, // Disabled - we'll print only API routes manually
+		EnablePrintRoutes:     false, // Disabled - we'll print only API routes manually
 		DisableStartupMessage: false,
 		ReadTimeout:           time.Duration(conf.ReadTimeout) * time.Second,
 		WriteTimeout:          time.Duration(conf.WriteTimeout) * time.Second,
