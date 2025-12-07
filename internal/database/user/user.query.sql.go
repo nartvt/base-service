@@ -110,16 +110,16 @@ func (q *Queries) GetUserByUsernameOrEmail(ctx context.Context, username string)
 }
 
 const ListUsers = `-- name: ListUsers :many
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at FROM users ORDER BY id LIMIT $1 OFFSET $2
+SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at FROM users WHERE id > $1 ORDER BY id LIMIT $2
 `
 
 type ListUsersParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	ID    int64 `json:"id"`
+	Limit int32 `json:"limit"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*User, error) {
-	rows, err := q.db.Query(ctx, ListUsers, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, ListUsers, arg.ID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

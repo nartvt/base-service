@@ -59,8 +59,15 @@ func (r *HttpServer) Start() {
 func (r *HttpServer) InitHttpServer() {
 	app := fiber.New(r.ConfigFiber(r.Conf))
 
+	// Security headers (first layer of defense)
+	app.Use(middleware.SecureHeadersMiddleware(middleware.DefaultSecurityHeadersConfig))
+
+	// Request ID tracking
+	app.Use(middleware.RequestIDMiddleware(middleware.DefaultRequestIDConfig))
+
 	// Apply CORS middleware with configuration
 	app.Use(middleware.CorsFilter(r.CORS.CORS))
+
 	// Apply general rate limiting to all API endpoints
 	if r.CORS != nil && r.CORS.RateLimit.Enabled {
 		app.Use(middleware.RateLimitFilter(r.CORS.RateLimit))

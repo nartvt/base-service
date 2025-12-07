@@ -17,10 +17,13 @@ log:
   addSource: true
 middleware:
   token:
-    passwordSalt: secret
-    accessTokenSecret: secret
+    # ⚠️ WARNING: NEVER commit real secrets to version control!
+    # Use environment variables: APP_MIDDLEWARE_TOKEN_PASSWORDSALT, APP_MIDDLEWARE_TOKEN_ACCESSTOKENSECRET, etc.
+    # These placeholder values will be overridden by environment variables in production
+    passwordSalt: "CHANGE_ME_USE_ENV_VAR"
+    accessTokenSecret: "CHANGE_ME_USE_ENV_VAR_MIN_32_BYTES"
     accessTokenExp: 10m # 10 minutes
-    refreshTokenSecret: refreshSecret
+    refreshTokenSecret: "CHANGE_ME_USE_ENV_VAR_MIN_32_BYTES"
     refreshTokenExp: 24h # 24 hours
   cors:
     allowedOrigins:
@@ -62,7 +65,8 @@ database:
   host: localhost
   port: 5432
   userName: postgres
-  password: root
+  # ⚠️ WARNING: Never hardcode passwords! Use APP_DATABASE_PASSWORD environment variable
+  password: "CHANGE_ME_USE_ENV_VAR"
   dbName: orders
   sslMode: disable
   maxOpenConnections: 10

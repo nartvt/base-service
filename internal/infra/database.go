@@ -15,7 +15,7 @@ type DatabaseClient struct {
 }
 
 func NewDatabaseClient(dbConfig *conf.DatabaseConfig) (*DatabaseClient, error) {
-	dbURL := dbConfig.BuildConnectionStringPosgres()
+	dbURL := dbConfig.BuildConnectionStringPostgres()
 
 	config, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {

@@ -18,6 +18,9 @@ func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisCl
 	jwtCache := middleware.NewJWTCache(redisClient.Redis(), true)
 	auth := middleware.NewAuthenHandler(cf.Middleware, jwtCache)
 
+	// Health and metrics endpoints (no auth required)
+	SetupHealthRoute(httpClient.App(), pool, redisClient.Redis())
+
 	apiv1 := httpClient.App().Group("/api/v1")
 	SetupUserRoute(apiv1, auth, pool, cf)
 

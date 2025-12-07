@@ -157,7 +157,7 @@ func LoadConfig(pathToFile string, env string, config any) error {
 	return nil
 }
 
-func (r *DatabaseConfig) BuildConnectionStringPosgres() string {
+func (r *DatabaseConfig) BuildConnectionStringPostgres() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		r.Host, r.Port, r.UserName, r.Password, r.DBName, func() string {
 			if len(r.SSLMode) == 0 {
