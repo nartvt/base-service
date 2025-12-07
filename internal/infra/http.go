@@ -23,7 +23,8 @@ type HttpServer struct {
 	AppName string
 	Conf    *config.ServerInfo
 	CORS    *config.MiddlewareConfig
-	Redis   *RedisClient
+	Redis   *redis.Client
+	RedisCf *config.RedisConfig
 	app     *fiber.App
 }
 
@@ -74,9 +75,9 @@ func (r *HttpServer) InitHttpServer() {
 	if r.CORS != nil && r.CORS.RateLimit.Enabled {
 		var redisClient *redis.Client
 		if r.CORS.RateLimit.UseRedis && r.Redis != nil {
-			redisClient = r.Redis.Redis()
+			redisClient = r.Redis
 		}
-		app.Use(middleware.RateLimitFilter(r.CORS.RateLimit, redisClient))
+		app.Use(middleware.RateLimitFilter(r.CORS.RateLimit, r.RedisCf, redisClient))
 	}
 
 	r.app = app

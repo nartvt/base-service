@@ -24,7 +24,7 @@ func SetupUserRoute(r fiber.Router, auth *middleware.AuthenHandler, db *pgxpool.
 		if conf.Middleware.RateLimit.UseRedis && redisClient != nil {
 			redisCli = redisClient
 		}
-		authGroup.Use(middleware.AuthRateLimitFilter(conf.Middleware.RateLimit, redisCli))
+		authGroup.Use(middleware.AuthRateLimitFilter(conf.Middleware.RateLimit, &conf.Redis, redisCli))
 	}
 	authHandler := handler.NewAuthHandler(userBiz, *auth)
 	POST(authGroup, "/register", authHandler.RegisterUser)

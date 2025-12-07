@@ -16,7 +16,7 @@ import (
 // RateLimitFilter creates a standard rate limiter middleware for general API endpoints
 // Default: 100 requests per minute per IP
 // If redisClient is provided, uses distributed rate limiting (shared across servers)
-func RateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredis.Client) fiber.Handler {
+func RateLimitFilter(rateLimitConfig config.RateLimitConfig, rediscf *config.RedisConfig, redisClient *goredis.Client) fiber.Handler {
 	if !rateLimitConfig.Enabled {
 		slog.Info("Rate limiting is disabled")
 		return func(c *fiber.Ctx) error {
@@ -44,7 +44,7 @@ func RateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredi
 	var storage fiber.Storage
 	storageType := "memory"
 	if redisClient != nil {
-		storage, storageType = NewRedisStorage(redisClient, rateLimitConfig)
+		storage, storageType = NewRedisStorage(redisClient, rediscf, rateLimitConfig)
 	}
 
 	slog.Info("Configuring rate limiting middleware",
@@ -80,10 +80,10 @@ func RateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredi
 	return limiter.New(config)
 }
 
-func NewRedisStorage(redisClient *goredis.Client, rateLimitConfig config.RateLimitConfig) (*redis.Storage, string) {
+func NewRedisStorage(redisClient *goredis.Client, rediscf *config.RedisConfig, rateLimitConfig config.RateLimitConfig) (*redis.Storage, string) {
 	storage := redis.New(redis.Config{
-		Host:     redisClient.Options().Addr,
-		Port:     0, // Port is included in Addr
+		Host:     rediscf.Host,
+		Port:     rediscf.Port, // Port is included in Addr
 		Database: rateLimitConfig.RedisDB,
 		Reset:    false,
 	})
@@ -96,7 +96,7 @@ func NewRedisStorage(redisClient *goredis.Client, rateLimitConfig config.RateLim
 // AuthRateLimitFilter creates a stricter rate limiter for authentication endpoints
 // Default: 5 requests per minute per IP (to prevent brute force attacks)
 // If redisClient is provided, uses distributed rate limiting (shared across servers)
-func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredis.Client) fiber.Handler {
+func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig, rediscf *config.RedisConfig, redisClient *goredis.Client) fiber.Handler {
 	if !rateLimitConfig.AuthEnabled {
 		slog.Info("Auth rate limiting is disabled")
 		return func(c *fiber.Ctx) error {
@@ -119,7 +119,7 @@ func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *go
 	var storage fiber.Storage
 	storageType := "memory"
 	if redisClient != nil {
-		storage, storageType = NewRedisStorage(redisClient, rateLimitConfig)
+		storage, storageType = NewRedisStorage(redisClient, rediscf, rateLimitConfig)
 	}
 
 	slog.Info("Configuring auth rate limiting middleware",

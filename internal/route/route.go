@@ -13,7 +13,8 @@ func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisCl
 		AppName: cf.Server.Http.AppName,
 		Conf:    &cf.Server.Http,
 		CORS:    &cf.Middleware,
-		Redis:   redisClient,
+		Redis:   redisClient.Redis(),
+		RedisCf: &cf.Redis,
 	}
 	httpClient.InitHttpServer()
 	jwtCache := middleware.NewJWTCache(redisClient.Redis(), true)
