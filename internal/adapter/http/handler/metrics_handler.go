@@ -10,18 +10,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type MetricsHandler interface {
-	Metrics(c *fiber.Ctx) error
-}
-
-type metricsHandlerImpl struct {
+// MetricsHandler handles metrics HTTP requests for Prometheus scraping.
+type MetricsHandler struct {
 	db        *pgxpool.Pool
 	redis     *redis.Client
 	startTime time.Time
 }
 
-func NewMetricsHandler(db *pgxpool.Pool, redis *redis.Client) MetricsHandler {
-	return &metricsHandlerImpl{
+// NewMetricsHandler creates a new metrics handler.
+func NewMetricsHandler(db *pgxpool.Pool, redis *redis.Client) *MetricsHandler {
+	return &MetricsHandler{
 		db:        db,
 		redis:     redis,
 		startTime: time.Now(),
@@ -34,7 +32,7 @@ func NewMetricsHandler(db *pgxpool.Pool, redis *redis.Client) MetricsHandler {
 // @Produce plain
 // @Success 200 {string} string "Prometheus metrics"
 // @Router /metrics [get]
-func (h *metricsHandlerImpl) Metrics(c *fiber.Ctx) error {
+func (h *MetricsHandler) Metrics(c *fiber.Ctx) error {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 

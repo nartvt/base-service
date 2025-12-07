@@ -4,26 +4,23 @@ import (
 	"context"
 	"time"
 
-	"base-service/internal/dto/response"
+	"base-service/internal/adapter/http/dto/response"
+	"base-service/internal/common"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
-type HealthHandler interface {
-	HealthCheck(c *fiber.Ctx) error
-	ReadinessCheck(c *fiber.Ctx) error
-	LivenessCheck(c *fiber.Ctx) error
-}
-
-type healthHandlerImpl struct {
+// HealthHandler handles health check HTTP requests.
+type HealthHandler struct {
 	db    *pgxpool.Pool
 	redis *redis.Client
 }
 
-func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) HealthHandler {
-	return &healthHandlerImpl{
+// NewHealthHandler creates a new health handler.
+func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) *HealthHandler {
+	return &HealthHandler{
 		db:    db,
 		redis: redis,
 	}
@@ -34,12 +31,12 @@ func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) HealthHandler {
 // @Tags Health
 // @Produce json
 // @Success 200 {object} response.HealthResponse
-// @Router /healthz [get]
-func (h *healthHandlerImpl) HealthCheck(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// @Router /health [get]
+func (h *HealthHandler) HealthCheck(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
 	defer cancel()
 
-	response := response.HealthResponse{
+	resp := response.HealthResponse{
 		Status:    "healthy",
 		Timestamp: time.Now().Unix(),
 		Services:  make(map[string]string),
@@ -49,33 +46,33 @@ func (h *healthHandlerImpl) HealthCheck(c *fiber.Ctx) error {
 	// Check database
 	if h.db != nil {
 		if err := h.db.Ping(ctx); err != nil {
-			response.Services["database"] = "unhealthy: " + err.Error()
-			response.Status = "degraded"
+			resp.Services["database"] = "unhealthy: " + err.Error()
+			resp.Status = "degraded"
 		} else {
-			response.Services["database"] = "healthy"
+			resp.Services["database"] = "healthy"
 		}
 	} else {
-		response.Services["database"] = "not configured"
+		resp.Services["database"] = "not configured"
 	}
 
 	// Check Redis
 	if h.redis != nil {
 		if err := h.redis.Ping(ctx).Err(); err != nil {
-			response.Services["redis"] = "unhealthy: " + err.Error()
-			response.Status = "degraded"
+			resp.Services["redis"] = "unhealthy: " + err.Error()
+			resp.Status = "degraded"
 		} else {
-			response.Services["redis"] = "healthy"
+			resp.Services["redis"] = "healthy"
 		}
 	} else {
-		response.Services["redis"] = "not configured"
+		resp.Services["redis"] = "not configured"
 	}
 
 	// Return 503 if any service is unhealthy
-	if response.Status == "degraded" {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(response)
+	if resp.Status == "degraded" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(common.ApiResponse(resp, nil, nil))
 	}
 
-	return c.JSON(response)
+	return c.JSON(common.ApiResponse(resp, nil, nil))
 }
 
 // @Summary Readiness check
@@ -83,9 +80,9 @@ func (h *healthHandlerImpl) HealthCheck(c *fiber.Ctx) error {
 // @Tags Health
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /ready [get]
-func (h *healthHandlerImpl) ReadinessCheck(c *fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+// @Router /health/readiness [get]
+func (h *HealthHandler) ReadinessCheck(c *fiber.Ctx) error {
+	ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
 	defer cancel()
 
 	// Check critical dependencies
@@ -108,8 +105,8 @@ func (h *healthHandlerImpl) ReadinessCheck(c *fiber.Ctx) error {
 // @Tags Health
 // @Produce json
 // @Success 200 {object} map[string]interface{}
-// @Router /live [get]
-func (h *healthHandlerImpl) LivenessCheck(c *fiber.Ctx) error {
+// @Router /health/liveness [get]
+func (h *HealthHandler) LivenessCheck(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"alive": true,
 	})

@@ -58,19 +58,19 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-type AuthenHandler struct {
+type AuthMiddleware struct {
 	config   config.MiddlewareConfig
 	jwtCache *JWTCache
 }
 
-func NewAuthenHandler(config config.MiddlewareConfig, jwtCache *JWTCache) *AuthenHandler {
-	return &AuthenHandler{
+func NewAuthenHandler(config config.MiddlewareConfig, jwtCache *JWTCache) *AuthMiddleware {
+	return &AuthMiddleware{
 		config:   config,
 		jwtCache: jwtCache,
 	}
 }
 
-func (a *AuthenHandler) GenerateAcessToken(userId int64, userName string) (*TokenPair, error) {
+func (a *AuthMiddleware) GenerateAcessToken(userId int64, userName string) (*TokenPair, error) {
 	accessScretConfig := a.config.Token.AccessTokenSecret
 	accessExpireConfig := a.config.Token.AccessTokenExp
 	accessToken, accessExp, err := a.generateToken(userId, userName, Prefix, accessScretConfig, accessExpireConfig)
@@ -84,7 +84,7 @@ func (a *AuthenHandler) GenerateAcessToken(userId int64, userName string) (*Toke
 	}, nil
 }
 
-func (a *AuthenHandler) GenerateTokenPair(userId int64, userName string) (*TokenPair, error) {
+func (a *AuthMiddleware) GenerateTokenPair(userId int64, userName string) (*TokenPair, error) {
 	accessScretConfig := a.config.Token.AccessTokenSecret
 	accessExpireConfig := a.config.Token.AccessTokenExp
 	refreshScretConfig := a.config.Token.RefreshTokenSecret
@@ -107,7 +107,7 @@ func (a *AuthenHandler) GenerateTokenPair(userId int64, userName string) (*Token
 	}, nil
 }
 
-func (a *AuthenHandler) generateToken(
+func (a *AuthMiddleware) generateToken(
 	userId int64,
 	username string,
 	tokenType string,
@@ -139,12 +139,12 @@ func (a *AuthenHandler) generateToken(
 	return signedToken, expiresAt, nil
 }
 
-func (a *AuthenHandler) ValidateRefreshToken(tokenString string) (*Claims, error) {
+func (a *AuthMiddleware) ValidateRefreshToken(tokenString string) (*Claims, error) {
 	refreshSecretConfig := a.config.Token.RefreshTokenSecret
 	return a.ValidateToken(tokenString, refreshSecretConfig, Prefix)
 }
 
-func (a *AuthenHandler) ValidateToken(tokenString, secretToken, expectedType string) (*Claims, error) {
+func (a *AuthMiddleware) ValidateToken(tokenString, secretToken, expectedType string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, ErrInvalidSignature
@@ -173,7 +173,7 @@ func (a *AuthenHandler) ValidateToken(tokenString, secretToken, expectedType str
 	return claims, nil
 }
 
-func (a *AuthenHandler) AuthMiddleware() fiber.Handler {
+func (a *AuthMiddleware) AuthMiddleware() fiber.Handler {
 	accessSecretConfig := a.config.Token.AccessTokenSecret
 	return func(c *fiber.Ctx) error {
 		ctx := c.Context()
@@ -238,7 +238,7 @@ func (a *AuthenHandler) AuthMiddleware() fiber.Handler {
 	}
 }
 
-func (a *AuthenHandler) handleError(c *fiber.Ctx, err error) error {
+func (a *AuthMiddleware) handleError(c *fiber.Ctx, err error) error {
 	status := fiber.StatusUnauthorized
 	message := "Authentication failed"
 
@@ -260,7 +260,7 @@ func (a *AuthenHandler) handleError(c *fiber.Ctx, err error) error {
 	return common.ResponseApi(c, nil, err)
 }
 
-func (a *AuthenHandler) RefreshToken(c *fiber.Ctx) error {
+func (a *AuthMiddleware) RefreshToken(c *fiber.Ctx) error {
 	refreshToken := c.Get(AuthorizationHeader)
 	refreshSecretConfig := a.config.Token.RefreshTokenSecret
 	if refreshToken == "" {
@@ -284,7 +284,7 @@ func (a *AuthenHandler) RefreshToken(c *fiber.Ctx) error {
 	return c.JSON(tokenPair)
 }
 
-func (a *AuthenHandler) ExtractUserFromContext(c *fiber.Ctx) (*Claims, error) {
+func (a *AuthMiddleware) ExtractUserFromContext(c *fiber.Ctx) (*Claims, error) {
 	user, ok := c.Locals("user").(*Claims)
 	if !ok {
 		return nil, errors.New("user not found in context")
@@ -292,7 +292,7 @@ func (a *AuthenHandler) ExtractUserFromContext(c *fiber.Ctx) (*Claims, error) {
 	return user, nil
 }
 
-func (r *AuthenHandler) GetUserNameFromContext(c *fiber.Ctx) (string, error) {
+func (r *AuthMiddleware) GetUserNameFromContext(c *fiber.Ctx) (string, error) {
 	userName := c.Locals("username")
 	if userName == nil {
 		return "", errors.New("user not found in context")
@@ -300,7 +300,7 @@ func (r *AuthenHandler) GetUserNameFromContext(c *fiber.Ctx) (string, error) {
 	return userName.(string), nil
 }
 
-func (r *AuthenHandler) GetUserIdFromContext(c *fiber.Ctx) (int64, error) {
+func (r *AuthMiddleware) GetUserIdFromContext(c *fiber.Ctx) (int64, error) {
 	userId := c.Locals("user_id")
 	if userId == nil {
 		return 0, errors.New("user not found in context")
@@ -309,7 +309,7 @@ func (r *AuthenHandler) GetUserIdFromContext(c *fiber.Ctx) (int64, error) {
 }
 
 // Logout blacklists the current access token, effectively logging out the user
-func (a *AuthenHandler) Logout(c *fiber.Ctx) error {
+func (a *AuthMiddleware) Logout(c *fiber.Ctx) error {
 	// Extract token from Authorization header
 	auth := c.Get(AuthorizationHeader)
 	if auth == "" {
@@ -354,7 +354,7 @@ func (a *AuthenHandler) Logout(c *fiber.Ctx) error {
 	})
 }
 
-func (a *AuthenHandler) expireJwtCache(c *fiber.Ctx, tokenString string, claims *Claims) error {
+func (a *AuthMiddleware) expireJwtCache(c *fiber.Ctx, tokenString string, claims *Claims) error {
 	ctx := c.Context()
 	err := a.jwtCache.BlacklistToken(ctx, tokenString, claims.ExpiresAt.Time)
 	if err != nil {
@@ -383,7 +383,7 @@ func (a *AuthenHandler) expireJwtCache(c *fiber.Ctx, tokenString string, claims 
 
 // HashPassword generates an argon2id hash of the password
 // Returns: base64-encoded string in format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
-func (s *AuthenHandler) HashPassword(password string) (string, error) {
+func (s *AuthMiddleware) HashPassword(password string) (string, error) {
 	if password == "" {
 		return "", errors.New("password cannot be empty")
 	}
@@ -425,7 +425,7 @@ func (s *AuthenHandler) HashPassword(password string) (string, error) {
 
 // VerifyPassword verifies a password against an argon2id hash
 // Returns true if the password matches, false otherwise
-func (s *AuthenHandler) VerifyPassword(password, encodedHash string) (bool, error) {
+func (s *AuthMiddleware) VerifyPassword(password, encodedHash string) (bool, error) {
 	if password == "" {
 		return false, errors.New("password cannot be empty")
 	}
@@ -484,7 +484,7 @@ func (s *AuthenHandler) VerifyPassword(password, encodedHash string) (bool, erro
 	return subtle.ConstantTimeCompare(storedHash, newHash) == 1, nil
 }
 
-func (s *AuthenHandler) GenerateGuestUsername(ctx context.Context, email string) (string, error) {
+func (s *AuthMiddleware) GenerateGuestUsername(ctx context.Context, email string) (string, error) {
 	parts := strings.Split(email, "@")
 	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid email format")

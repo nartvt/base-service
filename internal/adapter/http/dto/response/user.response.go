@@ -1,5 +1,6 @@
 package response
 
+// UserResponse represents a user in API responses.
 type UserResponse struct {
 	Id        int64  `json:"id"`
 	Username  string `json:"username"`
@@ -12,12 +13,14 @@ type UserResponse struct {
 	UpdatedAt int64  `json:"updated_at"`
 }
 
+// LoginResponse represents the response from a login request.
 type LoginResponse struct {
 	User         UserResponse `json:"user,omitempty"`
 	Token        string       `json:"token,omitempty"`
 	RefreshToken string       `json:"refresh_token,omitempty"`
 }
 
+// ProfileResponse represents a user profile in API responses.
 type ProfileResponse struct {
 	Id          int64                `json:"id,omitempty"`
 	Email       string               `json:"email,omitempty"`
@@ -31,12 +34,14 @@ type ProfileResponse struct {
 	UpdatedAt   int64                `json:"updated_at,omitempty"`
 }
 
+// ProfileTierResponse represents user tier information.
 type ProfileTierResponse struct {
 	Id        int64  `json:"id,omitempty"`
 	Code      string `json:"code,omitempty"`
 	CreatedAt int64  `json:"created_at,omitempty"`
 }
 
+// RegisterResponse represents the response from a registration request.
 type RegisterResponse struct {
 	Profile      ProfileResponse `json:"profile"`
 	Token        string          `json:"token"`

@@ -23,7 +23,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/healthz": {
+        "/health": {
             "get": {
                 "description": "Check if the service is healthy",
                 "produces": [
@@ -43,7 +43,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/live": {
+        "/health/liveness": {
             "get": {
                 "description": "Check if the service is alive (for Kubernetes liveness probe)",
                 "produces": [
@@ -53,6 +53,27 @@ const docTemplate = `{
                     "Health"
                 ],
                 "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/health/readiness": {
+            "get": {
+                "description": "Check if the service is ready to accept traffic",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -84,27 +105,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/ready": {
-            "get": {
-                "description": "Check if the service is ready to accept traffic",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Readiness check",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/v1/auth/login": {
             "post": {
                 "description": "Login user with username and password in the system",
@@ -131,7 +131,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response or Fail response. Code can be 'SUCCESS' or 'ERROR'.",
+                        "description": "Successful response",
                         "schema": {
                             "allOf": [
                                 {
@@ -175,7 +175,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response or Fail response. Code can be 'SUCCESS' or 'ERROR'.",
+                        "description": "Successful response",
                         "schema": {
                             "allOf": [
                                 {
@@ -185,7 +185,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/middleware.TokenPair"
+                                            "$ref": "#/definitions/port.TokenPair"
                                         }
                                     }
                                 }
@@ -207,7 +207,7 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Register new user",
+                "summary": "Register user",
                 "parameters": [
                     {
                         "description": "Registration credentials",
@@ -221,7 +221,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response or Fail response. Code can be 'SUCCESS' or 'ERROR'.",
+                        "description": "Successful response",
                         "schema": {
                             "allOf": [
                                 {
@@ -243,7 +243,12 @@ const docTemplate = `{
         },
         "/v1/user/profile": {
             "get": {
-                "description": "Get user profile",
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get the authenticated user's profile",
                 "consumes": [
                     "application/json"
                 ],
@@ -251,21 +256,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Users"
+                    "User"
                 ],
                 "summary": "Get user profile",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer authorization token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "Successful response or Fail response. Code can be 'SUCCESS' or 'ERROR'.",
+                        "description": "Successful response",
                         "schema": {
                             "allOf": [
                                 {
@@ -316,19 +312,13 @@ const docTemplate = `{
                 }
             }
         },
-        "middleware.TokenPair": {
+        "port.TokenPair": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "accessToken": {
                     "type": "string"
                 },
-                "expires_at": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                },
-                "token_type": {
+                "refreshToken": {
                     "type": "string"
                 }
             }

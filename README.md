@@ -133,32 +133,77 @@ Headers: Authorization: Bearer <access_token>
 
 ---
 
-## Project Structure
+## Project Structure (Clean Architecture)
+
+The project follows **Uncle Bob's Clean Architecture** principles with clear separation of concerns:
 
 ```
 base-service/
-├── cmd/                    # Application entrypoints
-├── config/                 # Configuration files
-│   ├── application.yaml   # Default config
-│   ├── application-dev.yaml
-│   └── application-prod.yaml
-├── internal/              # Private application code
-│   ├── biz/              # Business logic layer
-│   ├── common/           # Common utilities
-│   ├── database/         # SQLC generated code
-│   │   ├── migrations/  # Database migrations
-│   │   └── script/      # SQL schema and queries
-│   ├── dto/             # Data transfer objects
-│   ├── handler/         # HTTP handlers
-│   ├── infra/           # Infrastructure (DB, HTTP, logging)
-│   ├── middleware/      # HTTP middleware (CORS, auth, etc.)
-│   ├── repository/      # Data access layer
-│   └── route/           # Route definitions
-├── scripts/             # Helper scripts
-│   └── migrate.sh      # Database migration tool
-├── docs/               # Swagger documentation
-├── util/              # Public utilities
-└── main.go           # Application entry point
+├── main.go                     # Application entry point
+├── config/                     # Configuration files
+│   ├── application.yaml        # Default config
+│   └── config.go               # Config loader
+│
+├── internal/                   # Private application code
+│   │
+│   ├── domain/                 # 🏛️ DOMAIN LAYER (Core Business)
+│   │   ├── entity/             # Domain entities (pure Go structs)
+│   │   │   └── user.go
+│   │   ├── repository/         # Repository interfaces (ports)
+│   │   │   └── user_repository.go
+│   │   └── errors/             # Domain-specific errors
+│   │       └── errors.go
+│   │
+│   ├── usecase/                # 📋 APPLICATION LAYER (Use Cases)
+│   │   ├── port/               # Use case interfaces
+│   │   │   └── port.go
+│   │   ├── auth/               # Authentication use case
+│   │   │   └── auth_usecase.go
+│   │   └── user/               # User profile use case
+│   │       └── user_usecase.go
+│   │
+│   ├── adapter/                # 🔌 ADAPTER LAYER (Interface Adapters)
+│   │   ├── repository/         # Repository implementations
+│   │   │   ├── user_repository.go
+│   │   │   └── mapper/         # DB ↔ Entity mappers
+│   │   ├── auth/               # Auth adapter (wraps middleware)
+│   │   │   └── auth_adapter.go
+│   │   └── http/               # HTTP interface
+│   │       ├── handler/        # HTTP handlers
+│   │       │   ├── auth_handler.go
+│   │       │   ├── user_handler.go
+│   │       │   ├── health_handler.go
+│   │       │   └── metrics_handler.go
+│   │       ├── dto/            # Data transfer objects
+│   │       │   ├── request/
+│   │       │   └── response/
+│   │       └── mapper/         # Entity ↔ DTO mappers
+│   │
+│   ├── route/                  # Route definitions & DI wiring
+│   ├── middleware/             # HTTP middleware (auth, CORS, rate limit)
+│   ├── infra/                  # Infrastructure (DB, Redis, HTTP server)
+│   ├── database/               # SQLC generated code & migrations
+│   ├── common/                 # Shared utilities
+│   └── validator/              # Input validation
+│
+├── scripts/                    # Helper scripts
+├── docs/                       # Swagger documentation
+└── vendor/                     # Dependencies
+```
+
+### Layer Dependencies
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     HTTP / Framework                         │
+├─────────────────────────────────────────────────────────────┤
+│  adapter/http/handler  ───►  usecase  ───►  domain          │
+│  adapter/repository    ───────────────────►  domain          │
+├─────────────────────────────────────────────────────────────┤
+│                     Infrastructure                           │
+│              (database, middleware, infra)                   │
+└─────────────────────────────────────────────────────────────┘
+         Inner layers know nothing about outer layers
 ```
 
 ---
