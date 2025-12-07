@@ -433,53 +433,55 @@ func (s *AuthenHandler) VerifyPassword(password, encodedHash string) (bool, erro
 		return false, errors.New("hash cannot be empty")
 	}
 
-	// Parse the encoded hash to extract parameters, salt, and hash
-	var version int
-	var memory, time uint32
-	var threads uint8
-	var salt, hash string
-
-	_, err := fmt.Sscanf(
-		encodedHash,
-		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
-		&version,
-		&memory,
-		&time,
-		&threads,
-		&salt,
-		&hash,
-	)
-	if err != nil {
-		return false, fmt.Errorf("invalid hash format: %w", err)
+	// Parse the encoded hash to extract salt and parameters
+	// Format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
+	parts := strings.Split(encodedHash, "$")
+	if len(parts) != 6 {
+		return false, errors.New("invalid hash format")
 	}
 
-	// Decode salt and hash from base64
-	decodedSalt, err := base64.RawStdEncoding.DecodeString(salt)
+	// Verify algorithm
+	if parts[1] != "argon2id" {
+		return false, errors.New("unsupported algorithm")
+	}
+
+	// Parse version
+	var version int
+	_, err := fmt.Sscanf(parts[2], "v=%d", &version)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse version: %w", err)
+	}
+	// Parse parameters: m=memory,t=time,p=threads
+	var memory, time, threads uint32
+	_, err = fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse parameters: %w", err)
+	}
+
+	// Decode salt
+	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return false, fmt.Errorf("failed to decode salt: %w", err)
 	}
 
-	decodedHash, err := base64.RawStdEncoding.DecodeString(hash)
+	// Decode stored hash
+	storedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
 		return false, fmt.Errorf("failed to decode hash: %w", err)
 	}
 
-	// Generate hash with the same parameters
-	passwordHash := argon2.IDKey(
+	// Hash the input password with the SAME salt and parameters
+	newHash := argon2.IDKey(
 		[]byte(password),
-		decodedSalt,
+		salt,
 		time,
 		memory,
-		threads,
-		uint32(len(decodedHash)),
+		uint8(threads),
+		uint32(len(storedHash)),
 	)
 
 	// Use constant-time comparison to prevent timing attacks
-	if subtle.ConstantTimeCompare(decodedHash, passwordHash) == 1 {
-		return true, nil
-	}
-
-	return false, nil
+	return subtle.ConstantTimeCompare(storedHash, newHash) == 1, nil
 }
 
 func (s *AuthenHandler) GenerateGuestUsername(ctx context.Context, email string) (string, error) {

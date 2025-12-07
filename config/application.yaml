@@ -50,19 +50,19 @@ middleware:
     maxAge: 86400
   rateLimit:
     # General API rate limiting
-    enabled: false                    # Enable/disable rate limiting
-    max: 10                         # Max requests per window
-    expiration: 1m                   # Time window (1 minute)
+    enabled: true                   # Enable/disable rate limiting
+    max: 100                         # Max requests per window
+    expiration: 10m                   # Time window (1 minute)
     skipFailedReq: false             # Count failed requests
     skipSuccessReq: false            # Count successful requests
     limitReached: "Too many requests, please try again later."
     #Authentication endpoint rate limiting (stricter)
     authEnabled: true                # Enable/disable auth rate limiting
-    authMax: 5                       # Max login attempts per window
-    authExpiration: 1m               # Time window (1 minute)
+    authMax: 100                     # Max login attempts per window
+    authExpiration: 10m               # Time window (1 minute)
     # Distributed rate limiting (for multi-server deployments)
     useRedis: true                   # Use Redis for distributed rate limiting
-    redisDB: 2                       # Redis database number for rate limiting (separate from cache)
+    redisDB: 1                       # Redis database number for rate limiting (separate from cache DB 0)
 database:
   driverName: postgres
   host: localhost

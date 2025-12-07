@@ -21,9 +21,10 @@ func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisCl
 	auth := middleware.NewAuthenHandler(cf.Middleware, jwtCache)
 
 	// Health and metrics endpoints (no auth required)
-	SetupHealthRoute(httpClient.App(), pool, redisClient.Redis())
+	api := httpClient.App().Group("/api")
+	SetupHealthRoute(api, pool, redisClient.Redis())
 
-	apiv1 := httpClient.App().Group("/api/v1")
+	apiv1 := api.Group("/v1")
 	SetupUserRoute(apiv1, auth, pool, cf, redisClient.Redis())
 
 	// Print only API routes (not middleware routes)

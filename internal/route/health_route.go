@@ -8,16 +8,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func SetupHealthRoute(app *fiber.App, db *pgxpool.Pool, redis *redis.Client) {
+func SetupHealthRoute(r fiber.Router, db *pgxpool.Pool, redis *redis.Client) {
 	healthHandler := handler.NewHealthHandler(db, redis)
 	metricsHandler := handler.NewMetricsHandler(db, redis)
 
 	// Health check endpoints
-	app.Get("/healthz", healthHandler.HealthCheck)
-	app.Get("/health", healthHandler.HealthCheck) // Alternative endpoint
-	app.Get("/ready", healthHandler.ReadinessCheck)
-	app.Get("/live", healthHandler.LivenessCheck)
+	GET(r, "/healthz", healthHandler.HealthCheck)
+	GET(r, "/health", healthHandler.HealthCheck) // Alternative endpoint
+	GET(r, "/ready", healthHandler.ReadinessCheck)
+	GET(r, "/live", healthHandler.LivenessCheck)
 
 	// Metrics endpoint for Prometheus
-	app.Get("/metrics", metricsHandler.Metrics)
+	GET(r, "/metrics", metricsHandler.Metrics)
 }

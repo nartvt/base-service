@@ -33,7 +33,7 @@ func NewHealthHandler(db *pgxpool.Pool, redis *redis.Client) HealthHandler {
 // @Description Check if the service is healthy
 // @Tags Health
 // @Produce json
-// @Success 200 {object} HealthResponse
+// @Success 200 {object} response.HealthResponse
 // @Router /healthz [get]
 func (h *healthHandlerImpl) HealthCheck(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

@@ -7,14 +7,15 @@
 CREATE TABLE IF NOT EXISTS users (
     id            BIGSERIAL PRIMARY KEY,
     email         VARCHAR(255) NOT NULL,
-    avatar        VARCHAR(255) NOT NULL,
+    avatar        VARCHAR(255),
     phone_number  VARCHAR(20) NOT NULL,
     username      VARCHAR(50) NOT NULL,
     first_name    VARCHAR(50) NOT NULL,
     last_name     VARCHAR(50) NOT NULL,
     hash_password VARCHAR(255) NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    deleted_at    TIMESTAMPTZ NULL
 );
 
 -- Add unique constraints

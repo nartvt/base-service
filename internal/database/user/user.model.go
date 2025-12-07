@@ -11,6 +11,7 @@ import (
 type User struct {
 	ID           int64              `json:"id"`
 	Email        string             `json:"email"`
+	Avatar       pgtype.Text        `json:"avatar"`
 	PhoneNumber  string             `json:"phone_number"`
 	Username     string             `json:"username"`
 	FirstName    string             `json:"first_name"`

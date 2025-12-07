@@ -10,7 +10,7 @@ import (
 )
 
 const CreateUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, phone_number, first_name, last_name, hash_password) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at
+INSERT INTO users (username, email, phone_number, first_name, last_name, hash_password) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at
 `
 
 type CreateUserParams struct {
@@ -35,6 +35,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Avatar,
 		&i.PhoneNumber,
 		&i.Username,
 		&i.FirstName,
@@ -48,7 +49,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg *CreateUserParams) (*User,
 }
 
 const GetUser = `-- name: GetUser :one
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL
+SELECT id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (*User, error) {
@@ -57,6 +58,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (*User, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Avatar,
 		&i.PhoneNumber,
 		&i.Username,
 		&i.FirstName,
@@ -70,7 +72,7 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (*User, error) {
 }
 
 const GetUserByUserName = `-- name: GetUserByUserName :one
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE username = $1 AND deleted_at IS NULL
+SELECT id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE username = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByUserName(ctx context.Context, username string) (*User, error) {
@@ -79,6 +81,7 @@ func (q *Queries) GetUserByUserName(ctx context.Context, username string) (*User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Avatar,
 		&i.PhoneNumber,
 		&i.Username,
 		&i.FirstName,
@@ -92,7 +95,7 @@ func (q *Queries) GetUserByUserName(ctx context.Context, username string) (*User
 }
 
 const GetUserByUsernameOrEmail = `-- name: GetUserByUsernameOrEmail :one
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE (username = $1 OR email = $1) AND deleted_at IS NULL
+SELECT id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE (username = $1 OR email = $1) AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByUsernameOrEmail(ctx context.Context, username string) (*User, error) {
@@ -101,6 +104,7 @@ func (q *Queries) GetUserByUsernameOrEmail(ctx context.Context, username string)
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Avatar,
 		&i.PhoneNumber,
 		&i.Username,
 		&i.FirstName,
@@ -114,7 +118,7 @@ func (q *Queries) GetUserByUsernameOrEmail(ctx context.Context, username string)
 }
 
 const ListUsers = `-- name: ListUsers :many
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE deleted_at IS NULL ORDER BY id LIMIT $1 OFFSET $2
+SELECT id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE deleted_at IS NULL ORDER BY id LIMIT $1 OFFSET $2
 `
 
 type ListUsersParams struct {
@@ -134,6 +138,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*User,
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
+			&i.Avatar,
 			&i.PhoneNumber,
 			&i.Username,
 			&i.FirstName,
@@ -154,7 +159,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg *ListUsersParams) ([]*User,
 }
 
 const ValidateUserPasswordByUserName = `-- name: ValidateUserPasswordByUserName :one
-SELECT id, email, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE (username = $1 OR email = $1) AND hash_password = $2 AND deleted_at IS NULL
+SELECT id, email, avatar, phone_number, username, first_name, last_name, hash_password, created_at, updated_at, deleted_at FROM users WHERE (username = $1 OR email = $1) AND hash_password = $2 AND deleted_at IS NULL
 `
 
 type ValidateUserPasswordByUserNameParams struct {
@@ -169,6 +174,7 @@ func (q *Queries) ValidateUserPasswordByUserName(ctx context.Context, arg *Valid
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
+		&i.Avatar,
 		&i.PhoneNumber,
 		&i.Username,
 		&i.FirstName,

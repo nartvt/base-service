@@ -29,6 +29,9 @@ func NewDatabaseClient(dbConfig *conf.DatabaseConfig) (*DatabaseClient, error) {
 	config.HealthCheckPeriod = 1 * time.Minute        // tự động ping DB
 	config.MaxConnLifetimeJitter = 10 * time.Second   // tránh thundering herd
 
+	// Enable SQL query logging
+	config.ConnConfig.Tracer = &SQLTracer{}
+
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create connection pool: %w", err)

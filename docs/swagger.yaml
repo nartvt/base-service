@@ -46,10 +46,31 @@ definitions:
       last_name:
         type: string
       password:
+        maxLength: 16
+        minLength: 8
         type: string
       phone:
         type: string
       user_name:
+        maxLength: 16
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - user_name
+    type: object
+  response.HealthResponse:
+    properties:
+      services:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: integer
+      version:
         type: string
     type: object
   response.LoginResponse:
@@ -136,6 +157,60 @@ info:
   title: Base Service API
   version: "1.0"
 paths:
+  /healthz:
+    get:
+      description: Check if the service is healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.HealthResponse'
+      summary: Health check
+      tags:
+      - Health
+  /live:
+    get:
+      description: Check if the service is alive (for Kubernetes liveness probe)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Liveness check
+      tags:
+      - Health
+  /metrics:
+    get:
+      description: Get Prometheus-compatible metrics
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus metrics
+          schema:
+            type: string
+      summary: Metrics endpoint
+      tags:
+      - Monitoring
+  /ready:
+    get:
+      description: Check if the service is ready to accept traffic
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Readiness check
+      tags:
+      - Health
   /v1/auth/login:
     post:
       consumes:

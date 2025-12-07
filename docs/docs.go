@@ -23,6 +23,88 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/healthz": {
+            "get": {
+                "description": "Check if the service is healthy",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/live": {
+            "get": {
+                "description": "Check if the service is alive (for Kubernetes liveness probe)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "description": "Get Prometheus-compatible metrics",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Monitoring"
+                ],
+                "summary": "Metrics endpoint",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Check if the service is ready to accept traffic",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/login": {
             "post": {
                 "description": "Login user with username and password in the system",
@@ -264,6 +346,11 @@ const docTemplate = `{
         },
         "request.RegisterRequest": {
             "type": "object",
+            "required": [
+                "email",
+                "password",
+                "user_name"
+            ],
             "properties": {
                 "email": {
                     "type": "string"
@@ -275,12 +362,36 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 16,
+                    "minLength": 8
                 },
                 "phone": {
                     "type": "string"
                 },
                 "user_name": {
+                    "type": "string",
+                    "maxLength": 16,
+                    "minLength": 3
+                }
+            }
+        },
+        "response.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "version": {
                     "type": "string"
                 }
             }

@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
     id            BIGSERIAL PRIMARY KEY,
     email         VARCHAR(255) NOT NULL,
-    avatar        VARCHAR(255) NOT NULL,
+    avatar        VARCHAR(255),
     phone_number  VARCHAR(20) NOT NULL,
     username      VARCHAR(50) NOT NULL,
     first_name    VARCHAR(50) NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     hash_password VARCHAR(255) NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at    TIMESTAMPTZ NOT NULL
+    deleted_at    TIMESTAMPTZ
 );
 -- Performance indices for common query patterns
 -- Index on created_at for sorting and date range queries

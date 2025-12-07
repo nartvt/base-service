@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -85,7 +84,7 @@ func (h *authHandler) LoginUser(c *fiber.Ctx) error {
 	}
 
 	// Fetch user by username or email
-	userModel, err := h.uc.GetUserByUsernameOrEmail(context.Background(), req.UsernameOrEmail)
+	userModel, err := h.uc.GetUserByUsernameOrEmail(c.Context(), req.UsernameOrEmail)
 	if err != nil {
 		return common.ResponseApi(c, nil, errors.New("invalid username or password"))
 	}
