@@ -90,6 +90,10 @@ type RateLimitConfig struct {
 	AuthEnabled    bool          `mapstructure:"authEnabled" json:"auth_enabled,omitempty"`
 	AuthMax        int           `mapstructure:"authMax" json:"auth_max,omitempty"`
 	AuthExpiration time.Duration `mapstructure:"authExpiration" json:"auth_expiration,omitempty"`
+
+	// Distributed rate limiting (Redis storage)
+	UseRedis bool `mapstructure:"useRedis" json:"use_redis,omitempty"` // Use Redis for distributed rate limiting
+	RedisDB  int  `mapstructure:"redisDB" json:"redis_db,omitempty"`   // Redis database number for rate limiting
 }
 
 type RedisConfig struct {

@@ -32,7 +32,6 @@ go.work
 
 # Go Modules
 go.sum
-go.mod
 
 .*
 *.md

@@ -16,12 +16,14 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/swagger"
+	"github.com/redis/go-redis/v9"
 )
 
 type HttpServer struct {
 	AppName string
 	Conf    *config.ServerInfo
 	CORS    *config.MiddlewareConfig
+	Redis   *RedisClient
 	app     *fiber.App
 }
 
@@ -70,7 +72,11 @@ func (r *HttpServer) InitHttpServer() {
 
 	// Apply general rate limiting to all API endpoints
 	if r.CORS != nil && r.CORS.RateLimit.Enabled {
-		app.Use(middleware.RateLimitFilter(r.CORS.RateLimit))
+		var redisClient *redis.Client
+		if r.CORS.RateLimit.UseRedis && r.Redis != nil {
+			redisClient = r.Redis.Redis()
+		}
+		app.Use(middleware.RateLimitFilter(r.CORS.RateLimit, redisClient))
 	}
 
 	r.app = app

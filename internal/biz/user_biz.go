@@ -8,14 +8,13 @@ import (
 	"base-service/internal/dto/request"
 	"base-service/internal/dto/response"
 	"base-service/internal/repository"
-	"base-service/util"
 )
 
 type UserBiz interface {
 	ValidateUser(ctx context.Context, UsernameOrEmail string, hashPassword string) (*response.UserResponse, error)
 	GetUserByUsernameOrEmail(ctx context.Context, usernameOrEmail string) (*user.User, error)
 	RegisterUser(ctx context.Context, req *request.RegisterRequest) (response.ProfileResponse, error)
-	GetUserProfile(userName string) (*response.ProfileResponse, error)
+	GetUserProfile(ctx context.Context, userName string) (*response.ProfileResponse, error)
 }
 
 type userBizImpl struct {
@@ -53,8 +52,8 @@ func (b *userBizImpl) GetUserByUsernameOrEmail(ctx context.Context, usernameOrEm
 	return b.userRepository.GetUserByUsernameOrEmail(ctx, usernameOrEmail)
 }
 
-func (b *userBizImpl) GetUserProfile(username string) (*response.ProfileResponse, error) {
-	user, err := b.userRepository.GetUserByUserName(util.ContextwithTimeout(), username)
+func (b *userBizImpl) GetUserProfile(ctx context.Context, username string) (*response.ProfileResponse, error) {
+	user, err := b.userRepository.GetUserByUserName(ctx, username)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +61,9 @@ func (b *userBizImpl) GetUserProfile(username string) (*response.ProfileResponse
 		Id:          user.ID,
 		Email:       user.Email,
 		DisplayName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		Username:    user.Username,
+		CreatedAt:   user.CreatedAt.Time.UnixMilli(),
+		UpdatedAt:   user.UpdatedAt.Time.UnixMilli(),
 	}, nil
 }
 

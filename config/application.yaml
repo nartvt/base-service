@@ -60,6 +60,9 @@ middleware:
     authEnabled: true                # Enable/disable auth rate limiting
     authMax: 5                       # Max login attempts per window
     authExpiration: 1m               # Time window (1 minute)
+    # Distributed rate limiting (for multi-server deployments)
+    useRedis: true                   # Use Redis for distributed rate limiting
+    redisDB: 2                       # Redis database number for rate limiting (separate from cache)
 database:
   driverName: postgres
   host: localhost

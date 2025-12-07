@@ -13,6 +13,7 @@ func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisCl
 		AppName: cf.Server.Http.AppName,
 		Conf:    &cf.Server.Http,
 		CORS:    &cf.Middleware,
+		Redis:   redisClient,
 	}
 	httpClient.InitHttpServer()
 	jwtCache := middleware.NewJWTCache(redisClient.Redis(), true)
@@ -22,7 +23,7 @@ func InitRoute(cf *config.Config, pool *pgxpool.Pool, redisClient *infra.RedisCl
 	SetupHealthRoute(httpClient.App(), pool, redisClient.Redis())
 
 	apiv1 := httpClient.App().Group("/api/v1")
-	SetupUserRoute(apiv1, auth, pool, cf)
+	SetupUserRoute(apiv1, auth, pool, cf, redisClient.Redis())
 
 	// Print only API routes (not middleware routes)
 	httpClient.Start()

@@ -21,5 +21,14 @@ CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at DESC);
 -- Index on updated_at for change tracking and sync queries
 CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users(updated_at DESC);
 
+-- Partial index for active user lookups (example for future use)
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE deleted_at IS NULL;
+
+-- Partial index for email and phone number lookups (example for future use)
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE deleted_at IS NULL;
+
+-- Partial index for phone number lookups (example for future use)
+CREATE INDEX IF NOT EXISTS idx_users_phone_number ON users(phone_number) WHERE deleted_at IS NULL;
+
 -- Analyze table to update query planner statistics
 ANALYZE users;

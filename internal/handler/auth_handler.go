@@ -50,7 +50,7 @@ func (h *authHandler) RegisterUser(c *fiber.Ctx) error {
 	}
 	req.HashedPassword = hashPassword
 
-	profile, err := h.uc.RegisterUser(context.Background(), req)
+	profile, err := h.uc.RegisterUser(c.Context(), req)
 	if err != nil {
 		return common.ResponseApi(c, nil, err)
 	}

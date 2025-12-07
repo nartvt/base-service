@@ -9,11 +9,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/storage/redis/v3"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 // RateLimitFilter creates a standard rate limiter middleware for general API endpoints
 // Default: 100 requests per minute per IP
-func RateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
+// If redisClient is provided, uses distributed rate limiting (shared across servers)
+func RateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredis.Client) fiber.Handler {
 	if !rateLimitConfig.Enabled {
 		slog.Info("Rate limiting is disabled")
 		return func(c *fiber.Ctx) error {
@@ -37,13 +40,22 @@ func RateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
 		limitReached = "Too many requests, please try again later."
 	}
 
+	// Configure storage (Redis for distributed, memory for single-server)
+	var storage fiber.Storage
+	storageType := "memory"
+	if redisClient != nil {
+		storage, storageType = NewRedisStorage(redisClient, rateLimitConfig)
+	}
+
 	slog.Info("Configuring rate limiting middleware",
 		"max", max,
 		"expiration", expiration,
+		"storage", storageType,
 		"skipFailedReq", rateLimitConfig.SkipFailedReq,
 	)
 
-	return limiter.New(limiter.Config{
+	config := limiter.Config{
+		Storage:                storage,
 		Max:                    max,
 		Expiration:             expiration,
 		SkipFailedRequests:     rateLimitConfig.SkipFailedReq,
@@ -63,12 +75,28 @@ func RateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
 				"message": limitReached,
 			})
 		},
+	}
+
+	return limiter.New(config)
+}
+
+func NewRedisStorage(redisClient *goredis.Client, rateLimitConfig config.RateLimitConfig) (*redis.Storage, string) {
+	storage := redis.New(redis.Config{
+		Host:     redisClient.Options().Addr,
+		Port:     0, // Port is included in Addr
+		Database: rateLimitConfig.RedisDB,
+		Reset:    false,
 	})
+	slog.Info("Using distributed auth rate limiting (Redis)",
+		"redis_db", rateLimitConfig.RedisDB,
+	)
+	return storage, "redis"
 }
 
 // AuthRateLimitFilter creates a stricter rate limiter for authentication endpoints
 // Default: 5 requests per minute per IP (to prevent brute force attacks)
-func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
+// If redisClient is provided, uses distributed rate limiting (shared across servers)
+func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig, redisClient *goredis.Client) fiber.Handler {
 	if !rateLimitConfig.AuthEnabled {
 		slog.Info("Auth rate limiting is disabled")
 		return func(c *fiber.Ctx) error {
@@ -87,12 +115,21 @@ func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
 		expiration = 1 * time.Minute
 	}
 
+	// Configure storage (Redis for distributed, memory for single-server)
+	var storage fiber.Storage
+	storageType := "memory"
+	if redisClient != nil {
+		storage, storageType = NewRedisStorage(redisClient, rateLimitConfig)
+	}
+
 	slog.Info("Configuring auth rate limiting middleware",
 		"max", max,
 		"expiration", expiration,
+		"storage", storageType,
 	)
 
-	return limiter.New(limiter.Config{
+	config := limiter.Config{
+		Storage:    storage,
 		Max:        max,
 		Expiration: expiration,
 		KeyGenerator: func(c *fiber.Ctx) string {
@@ -111,5 +148,7 @@ func AuthRateLimitFilter(rateLimitConfig config.RateLimitConfig) fiber.Handler {
 				"message": fmt.Sprintf("Too many authentication attempts. Please try again in %v.", expiration),
 			})
 		},
-	})
+	}
+
+	return limiter.New(config)
 }

@@ -34,7 +34,7 @@ func NewUserHandler(userBiz biz.UserBiz, auth middleware.AuthenHandler) UserHand
 // @Router /v1/user/profile [get]
 func (h *userHandlerImpl) Profile(c *fiber.Ctx) error {
 	userName := c.Locals("username").(string)
-	profile, err := h.rBiz.GetUserProfile(userName)
+	profile, err := h.rBiz.GetUserProfile(c.Context(), userName)
 	if err != nil {
 		return common.ResponseApi(c, nil, err)
 	}

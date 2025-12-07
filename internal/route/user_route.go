@@ -9,9 +9,10 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
-func SetupUserRoute(r fiber.Router, auth *middleware.AuthenHandler, db *pgxpool.Pool, conf *config.Config) {
+func SetupUserRoute(r fiber.Router, auth *middleware.AuthenHandler, db *pgxpool.Pool, conf *config.Config, redisClient *redis.Client) {
 	userRepository := repository.NewUserRepository(db, db)
 	userBiz := biz.NewUserBiz(userRepository)
 	userHandler := handler.NewUserHandler(userBiz, *auth)
@@ -19,7 +20,11 @@ func SetupUserRoute(r fiber.Router, auth *middleware.AuthenHandler, db *pgxpool.
 	// Apply auth rate limiting to authentication endpoints
 	authGroup := r.Group("/auth")
 	if conf.Middleware.RateLimit.AuthEnabled {
-		authGroup.Use(middleware.AuthRateLimitFilter(conf.Middleware.RateLimit))
+		var redisCli *redis.Client
+		if conf.Middleware.RateLimit.UseRedis && redisClient != nil {
+			redisCli = redisClient
+		}
+		authGroup.Use(middleware.AuthRateLimitFilter(conf.Middleware.RateLimit, redisCli))
 	}
 	authHandler := handler.NewAuthHandler(userBiz, *auth)
 	POST(authGroup, "/register", authHandler.RegisterUser)
