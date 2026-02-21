@@ -102,6 +102,7 @@ type RedisConfig struct {
 	Password     string        `mapstructure:"password" json:"password,omitempty"`
 	DB           int           `mapstructure:"db" json:"db,omitempty"`
 	MaxIdle      int           `mapstructure:"maxIdle" json:"max_idle,omitempty"`
+	MinIdle      int           `mapstructure:"minIdle" json:"min_idle,omitempty"`
 	DialTimeout  time.Duration `mapstructure:"dialTimeout" json:"dial_timeout,omitempty"`
 	ReadTimeout  time.Duration `mapstructure:"readTimeout" json:"read_timeout,omitempty"`
 	WriteTimeout time.Duration `mapstructure:"writeTimeout" json:"write_timeout,omitempty"`
@@ -173,7 +174,7 @@ func (r *DatabaseConfig) BuildConnectionStringPostgres() string {
 }
 
 func (r *RedisConfig) BuildRedisConnectionString() string {
-	return fmt.Sprintf("redis://%s:%s@%s:%d", "", "", r.Host, r.Port)
+	return fmt.Sprintf("redis://%s:%s@%s:%d", "default", "", r.Host, r.Port)
 }
 
 func (c *CORSConfig) GetOriginsString() string {

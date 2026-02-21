@@ -85,6 +85,27 @@ const docTemplate = `{
                 }
             }
         },
+        "/health/stats": {
+            "get": {
+                "description": "Get infrastructure statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Infrastructure stats",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/metrics": {
             "get": {
                 "description": "Get Prometheus-compatible metrics",

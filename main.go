@@ -8,11 +8,8 @@ import (
 	"base-service/config"
 	"base-service/internal/infra"
 	"base-service/internal/route"
-	"base-service/util"
 
 	_ "base-service/docs"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // @title Base Service API
@@ -30,14 +27,11 @@ import (
 // @BasePath /api
 
 var (
-	flagConf   string
 	configPath string
-	envFile    string
 	env        string = ""
 )
 
 func init() {
-	util.LoadEnv()
 	// Define flags
 	flag.StringVar(&configPath, "config", "config", "path to config file")
 	flag.StringVar(&env, "env", "", "env")
@@ -60,36 +54,79 @@ func main() {
 }
 
 func StartServer(cfg *config.Config) {
-	db := InitDatabase(&cfg.Database)
-	rd := InitRedis(&cfg.Redis)
-	route.InitRoute(cfg, db, rd)
+	// Initialize infrastructure registry
+	registry := infra.NewRegistry()
 
-	defer db.Close()
-	defer rd.Close()
+	// Initialize and register database
+	db, err := initDatabase(&cfg.Database)
+	if err != nil {
+		slog.Error("Failed to initialize database", "error", err)
+		panic(err)
+	}
+	if err := registry.RegisterDatabase(db); err != nil {
+		slog.Error("Failed to register database", "error", err)
+		panic(err)
+	}
+
+	// Initialize and register cache
+	cache, err := initRedis(&cfg.Redis)
+	if err != nil {
+		slog.Error("Failed to initialize redis", "error", err)
+		panic(err)
+	}
+	if err := registry.RegisterCache(cache); err != nil {
+		slog.Error("Failed to register cache", "error", err)
+		panic(err)
+	}
+
+	// Log infrastructure stats
+	logInfraStats(registry)
+
+	// Initialize routes (backward compatible - using pool and redis client)
+	route.InitRoute(cfg, db.GetPool(), cache)
+
+	// Graceful shutdown - close all connections via registry
+	defer func() {
+		slog.Info("Shutting down infrastructure...")
+		if err := registry.Close(); err != nil {
+			slog.Error("Error closing infrastructure", "error", err)
+		}
+	}()
 }
 
-func InitRedis(conf *config.RedisConfig) *infra.RedisClient {
+func initRedis(conf *config.RedisConfig) (*infra.RedisClient, error) {
 	client, err := infra.NewRedisClient(conf)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to connect to redis, %v", err))
-		panic(err)
+		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 	if client == nil {
-		slog.Error("failed to connect to redis")
-		panic("failed to connect to redis")
+		return nil, fmt.Errorf("redis client is nil")
 	}
-	return client
+	return client, nil
 }
 
-func InitDatabase(conf *config.DatabaseConfig) *pgxpool.Pool {
+func initDatabase(conf *config.DatabaseConfig) (*infra.DatabaseClient, error) {
 	client, err := infra.NewDatabaseClient(conf)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to connect to database, %v", err))
-		panic(err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	if client == nil {
-		slog.Error("failed to connect to database")
-		panic("failed to connect to database")
+		return nil, fmt.Errorf("database client is nil")
 	}
-	return client.GetPool()
+	return client, nil
+}
+
+func logInfraStats(registry *infra.Registry) {
+	stats := registry.Stats()
+	slog.Info("Infrastructure initialized",
+		"total_connections", stats.TotalConnections,
+	)
+
+	if stats.Database != nil {
+		slog.Info("Database pool stats",
+			"max_connections", stats.Database.MaxConnections,
+			"current_connections", stats.Database.CurrentConnections,
+			"idle_connections", stats.Database.IdleConnections,
+		)
+	}
 }

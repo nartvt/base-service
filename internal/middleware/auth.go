@@ -2,9 +2,6 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,8 +14,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/argon2"
 )
+
+// =============================================================================
+// Errors
+// =============================================================================
 
 var (
 	ErrInvalidToken     = errors.New("invalid token")
@@ -27,6 +27,13 @@ var (
 	ErrMissingToken     = errors.New("missing token")
 	ErrInvalidSignature = errors.New("invalid token signature")
 	ErrInvalidPassword  = errors.New("invalid password")
+)
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const (
 	Prefix              = "Bearer"
 	RefreshTokenKeyName = "refreshToken"
 	AccessTokenKeyName  = "accessToken"
@@ -34,16 +41,11 @@ var (
 	RefreshTokenHeader  = "RefreshToken"
 )
 
-// Argon2id parameters - based on OWASP recommendations for 2024
-// These provide ~50-100ms hash time on modern hardware
-const (
-	argon2Time       = 3         // Number of iterations
-	argon2Memory     = 64 * 1024 // 64 MB of memory
-	argon2Threads    = 2         // Number of parallel threads
-	argon2KeyLength  = 32        // Length of the derived key
-	argon2SaltLength = 16        // Length of the random salt
-)
+// =============================================================================
+// Token Types
+// =============================================================================
 
+// TokenPair represents access and refresh tokens.
 type TokenPair struct {
 	AccessToken  string    `json:"access_token,omitempty"`
 	RefreshToken string    `json:"refresh_token,omitempty"`
@@ -51,6 +53,7 @@ type TokenPair struct {
 	TokenType    string    `json:"token_type,omitempty"`
 }
 
+// Claims represents JWT token claims.
 type Claims struct {
 	UserId    int64  `json:"user_id,omitempty"`
 	UserName  string `json:"username,omitempty"`
@@ -58,22 +61,52 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+// =============================================================================
+// AuthMiddleware Implementation
+// clean-arch: Implements TokenService interface
+// =============================================================================
+
+// Compile-time interface compliance check
+var _ TokenService = (*AuthMiddleware)(nil)
+
+// AuthMiddleware handles JWT authentication and implements TokenService.
 type AuthMiddleware struct {
-	config   config.MiddlewareConfig
-	jwtCache *JWTCache
+	config         config.MiddlewareConfig
+	tokenCache     TokenCache
+	passwordHasher PasswordHasher
 }
 
+// NewAuthenHandler creates a new AuthMiddleware (backward compatible).
 func NewAuthenHandler(config config.MiddlewareConfig, jwtCache *JWTCache) *AuthMiddleware {
 	return &AuthMiddleware{
-		config:   config,
-		jwtCache: jwtCache,
+		config:         config,
+		tokenCache:     jwtCache,
+		passwordHasher: NewArgon2PasswordHasher(),
 	}
 }
 
-func (a *AuthMiddleware) GenerateAcessToken(userId int64, userName string) (*TokenPair, error) {
-	accessScretConfig := a.config.Token.AccessTokenSecret
+// NewAuthMiddleware creates a new AuthMiddleware with explicit dependencies.
+// clean-arch: Constructor with dependency injection
+func NewAuthMiddleware(config config.MiddlewareConfig, tokenCache TokenCache, passwordHasher PasswordHasher) *AuthMiddleware {
+	if passwordHasher == nil {
+		passwordHasher = NewArgon2PasswordHasher()
+	}
+	return &AuthMiddleware{
+		config:         config,
+		tokenCache:     tokenCache,
+		passwordHasher: passwordHasher,
+	}
+}
+
+// =============================================================================
+// TokenService Interface Implementation
+// =============================================================================
+
+// GenerateAccessToken generates a new access token (implements TokenService).
+func (a *AuthMiddleware) GenerateAccessToken(userID int64, username string) (*TokenPair, error) {
+	accessSecretConfig := a.config.Token.AccessTokenSecret
 	accessExpireConfig := a.config.Token.AccessTokenExp
-	accessToken, accessExp, err := a.generateToken(userId, userName, Prefix, accessScretConfig, accessExpireConfig)
+	accessToken, accessExp, err := a.generateToken(userID, username, Prefix, accessSecretConfig, accessExpireConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
@@ -84,17 +117,19 @@ func (a *AuthMiddleware) GenerateAcessToken(userId int64, userName string) (*Tok
 	}, nil
 }
 
-func (a *AuthMiddleware) GenerateTokenPair(userId int64, userName string) (*TokenPair, error) {
-	accessScretConfig := a.config.Token.AccessTokenSecret
+// GenerateTokenPair generates both access and refresh tokens (implements TokenService).
+func (a *AuthMiddleware) GenerateTokenPair(userID int64, username string) (*TokenPair, error) {
+	accessSecretConfig := a.config.Token.AccessTokenSecret
 	accessExpireConfig := a.config.Token.AccessTokenExp
-	refreshScretConfig := a.config.Token.RefreshTokenSecret
+	refreshSecretConfig := a.config.Token.RefreshTokenSecret
 	refreshExpireConfig := a.config.Token.RefreshTokenExp
-	accessToken, accessExp, err := a.generateToken(userId, userName, Prefix, accessScretConfig, accessExpireConfig)
+
+	accessToken, accessExp, err := a.generateToken(userID, username, Prefix, accessSecretConfig, accessExpireConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	refreshToken, _, err := a.generateToken(userId, userName, Prefix, refreshScretConfig, refreshExpireConfig)
+	refreshToken, _, err := a.generateToken(userID, username, Prefix, refreshSecretConfig, refreshExpireConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
@@ -106,6 +141,21 @@ func (a *AuthMiddleware) GenerateTokenPair(userId int64, userName string) (*Toke
 		TokenType:    Prefix,
 	}, nil
 }
+
+// ValidateAccessToken validates an access token (implements TokenService).
+func (a *AuthMiddleware) ValidateAccessToken(token string) (*Claims, error) {
+	return a.ValidateToken(token, a.config.Token.AccessTokenSecret, Prefix)
+}
+
+// ValidateRefreshToken validates a refresh token (implements TokenService).
+func (a *AuthMiddleware) ValidateRefreshToken(tokenString string) (*Claims, error) {
+	refreshSecretConfig := a.config.Token.RefreshTokenSecret
+	return a.ValidateToken(tokenString, refreshSecretConfig, Prefix)
+}
+
+// =============================================================================
+// Token Generation & Validation (Internal)
+// =============================================================================
 
 func (a *AuthMiddleware) generateToken(
 	userId int64,
@@ -139,11 +189,7 @@ func (a *AuthMiddleware) generateToken(
 	return signedToken, expiresAt, nil
 }
 
-func (a *AuthMiddleware) ValidateRefreshToken(tokenString string) (*Claims, error) {
-	refreshSecretConfig := a.config.Token.RefreshTokenSecret
-	return a.ValidateToken(tokenString, refreshSecretConfig, Prefix)
-}
-
+// ValidateToken validates a JWT token with the given secret and expected type.
 func (a *AuthMiddleware) ValidateToken(tokenString, secretToken, expectedType string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -173,6 +219,11 @@ func (a *AuthMiddleware) ValidateToken(tokenString, secretToken, expectedType st
 	return claims, nil
 }
 
+// =============================================================================
+// HTTP Middleware Handler
+// =============================================================================
+
+// AuthMiddleware returns a Fiber middleware handler for JWT authentication.
 func (a *AuthMiddleware) AuthMiddleware() fiber.Handler {
 	accessSecretConfig := a.config.Token.AccessTokenSecret
 	return func(c *fiber.Ctx) error {
@@ -190,7 +241,7 @@ func (a *AuthMiddleware) AuthMiddleware() fiber.Handler {
 		tokenString := accessToken[1]
 
 		// Check if token is blacklisted (logged out)
-		if a.jwtCache != nil && a.jwtCache.IsBlacklisted(ctx, tokenString) {
+		if a.tokenCache != nil && a.tokenCache.IsEnabled() && a.tokenCache.IsBlacklisted(ctx, tokenString) {
 			slog.Warn("Blocked blacklisted token attempt",
 				"ip", c.IP(),
 				"path", c.Path(),
@@ -199,16 +250,13 @@ func (a *AuthMiddleware) AuthMiddleware() fiber.Handler {
 		}
 
 		// Check cache first for valid token
-		if a.jwtCache != nil {
-			if userID, found := a.jwtCache.GetCachedToken(ctx, tokenString); found {
+		if a.tokenCache != nil && a.tokenCache.IsEnabled() {
+			if userID, found := a.tokenCache.GetCachedToken(ctx, tokenString); found {
 				// Cache hit - use cached user ID
 				claims := &Claims{
 					UserId: userID,
-					// Note: We only cache user ID for performance
-					// Full claims will be from original token validation
 				}
-				c.Locals("user", claims)
-				c.Locals("user_id", userID)
+				SetUserInContext(c, claims)
 
 				slog.Debug("JWT cache hit, skipping validation",
 					"user_id", userID,
@@ -226,13 +274,12 @@ func (a *AuthMiddleware) AuthMiddleware() fiber.Handler {
 		}
 
 		// Cache the validated token
-		if a.jwtCache != nil && claims.ExpiresAt != nil {
-			_ = a.jwtCache.CacheValidToken(ctx, tokenString, claims.UserId, claims.ExpiresAt.Time)
+		if a.tokenCache != nil && a.tokenCache.IsEnabled() && claims.ExpiresAt != nil {
+			_ = a.tokenCache.CacheToken(ctx, tokenString, claims.UserId, claims.ExpiresAt.Time)
 		}
 
-		c.Locals("user", claims)
-		c.Locals("user_id", claims.UserId)
-		c.Locals("username", claims.UserName)
+		// Use type-safe context helpers
+		SetUserInContext(c, claims)
 
 		return c.Next()
 	}
@@ -260,6 +307,11 @@ func (a *AuthMiddleware) handleError(c *fiber.Ctx, err error) error {
 	return common.ResponseApi(c, nil, err)
 }
 
+// =============================================================================
+// Refresh Token Handler
+// =============================================================================
+
+// RefreshToken handles token refresh requests.
 func (a *AuthMiddleware) RefreshToken(c *fiber.Ctx) error {
 	refreshToken := c.Get(AuthorizationHeader)
 	refreshSecretConfig := a.config.Token.RefreshTokenSecret
@@ -284,31 +336,42 @@ func (a *AuthMiddleware) RefreshToken(c *fiber.Ctx) error {
 	return c.JSON(tokenPair)
 }
 
+// =============================================================================
+// Context Helpers (Backward Compatible)
+// =============================================================================
+
+// ExtractUserFromContext retrieves user claims from context (backward compatible).
 func (a *AuthMiddleware) ExtractUserFromContext(c *fiber.Ctx) (*Claims, error) {
-	user, ok := c.Locals("user").(*Claims)
+	claims, ok := GetUserFromContext(c)
 	if !ok {
 		return nil, errors.New("user not found in context")
 	}
-	return user, nil
+	return claims, nil
 }
 
-func (r *AuthMiddleware) GetUserNameFromContext(c *fiber.Ctx) (string, error) {
-	userName := c.Locals("username")
-	if userName == nil {
+// GetUserNameFromContext retrieves username from context (backward compatible).
+func (a *AuthMiddleware) GetUserNameFromContext(c *fiber.Ctx) (string, error) {
+	username, ok := GetUsernameFromContext(c)
+	if !ok {
 		return "", errors.New("user not found in context")
 	}
-	return userName.(string), nil
+	return username, nil
 }
 
-func (r *AuthMiddleware) GetUserIdFromContext(c *fiber.Ctx) (int64, error) {
-	userId := c.Locals("user_id")
-	if userId == nil {
+// GetUserIdFromContext retrieves user ID from context (backward compatible).
+func (a *AuthMiddleware) GetUserIdFromContext(c *fiber.Ctx) (int64, error) {
+	userID, ok := GetUserIDFromContext(c)
+	if !ok {
 		return 0, errors.New("user not found in context")
 	}
-	return userId.(int64), nil
+	return userID, nil
 }
 
-// Logout blacklists the current access token, effectively logging out the user
+// =============================================================================
+// Logout Handler
+// =============================================================================
+
+// Logout blacklists the current access token, effectively logging out the user.
 func (a *AuthMiddleware) Logout(c *fiber.Ctx) error {
 	// Extract token from Authorization header
 	auth := c.Get(AuthorizationHeader)
@@ -340,8 +403,8 @@ func (a *AuthMiddleware) Logout(c *fiber.Ctx) error {
 	}
 
 	// Blacklist the token if caching is enabled
-	if a.jwtCache != nil && claims.ExpiresAt != nil {
-		return a.expireJwtCache(c, tokenString, claims)
+	if a.tokenCache != nil && a.tokenCache.IsEnabled() && claims.ExpiresAt != nil {
+		return a.expireTokenCache(c, tokenString, claims)
 	}
 
 	// JWT caching is disabled - can't blacklist
@@ -354,9 +417,9 @@ func (a *AuthMiddleware) Logout(c *fiber.Ctx) error {
 	})
 }
 
-func (a *AuthMiddleware) expireJwtCache(c *fiber.Ctx, tokenString string, claims *Claims) error {
+func (a *AuthMiddleware) expireTokenCache(c *fiber.Ctx, tokenString string, claims *Claims) error {
 	ctx := c.Context()
-	err := a.jwtCache.BlacklistToken(ctx, tokenString, claims.ExpiresAt.Time)
+	err := a.tokenCache.BlacklistToken(ctx, tokenString, claims.ExpiresAt.Time)
 	if err != nil {
 		slog.Error("Failed to blacklist token during logout",
 			"error", err,
@@ -369,7 +432,7 @@ func (a *AuthMiddleware) expireJwtCache(c *fiber.Ctx, tokenString string, claims
 	}
 
 	// Also invalidate from valid token cache
-	_ = a.jwtCache.InvalidateToken(ctx, tokenString)
+	_ = a.tokenCache.InvalidateToken(ctx, tokenString)
 
 	slog.Info("User logged out successfully",
 		"user_id", claims.UserId,
@@ -381,110 +444,31 @@ func (a *AuthMiddleware) expireJwtCache(c *fiber.Ctx, tokenString string, claims
 	})
 }
 
-// HashPassword generates an argon2id hash of the password
-// Returns: base64-encoded string in format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
-func (s *AuthMiddleware) HashPassword(password string) (string, error) {
-	if password == "" {
-		return "", errors.New("password cannot be empty")
-	}
+// =============================================================================
+// Password Methods (Delegates to PasswordHasher)
+// =============================================================================
 
-	// Generate a cryptographically secure random salt
-	salt := make([]byte, argon2SaltLength)
-	if _, err := rand.Read(salt); err != nil {
-		return "", fmt.Errorf("failed to generate salt: %w", err)
-	}
-
-	// Generate the hash using argon2id
-	hash := argon2.IDKey(
-		[]byte(password),
-		salt,
-		argon2Time,
-		argon2Memory,
-		argon2Threads,
-		argon2KeyLength,
-	)
-
-	// Encode salt and hash to base64
-	b64Salt := base64.RawStdEncoding.EncodeToString(salt)
-	b64Hash := base64.RawStdEncoding.EncodeToString(hash)
-
-	// Return in PHC string format for easy parsing and future-proofing
-	// Format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
-	encodedHash := fmt.Sprintf(
-		"$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
-		argon2.Version,
-		argon2Memory,
-		argon2Time,
-		argon2Threads,
-		b64Salt,
-		b64Hash,
-	)
-
-	return encodedHash, nil
+// HashPassword generates an argon2id hash of the password (backward compatible).
+func (a *AuthMiddleware) HashPassword(password string) (string, error) {
+	return a.passwordHasher.Hash(password)
 }
 
-// VerifyPassword verifies a password against an argon2id hash
-// Returns true if the password matches, false otherwise
-func (s *AuthMiddleware) VerifyPassword(password, encodedHash string) (bool, error) {
-	if password == "" {
-		return false, errors.New("password cannot be empty")
-	}
-	if encodedHash == "" {
-		return false, errors.New("hash cannot be empty")
-	}
-
-	// Parse the encoded hash to extract salt and parameters
-	// Format: $argon2id$v=19$m=65536,t=3,p=2$<salt>$<hash>
-	parts := strings.Split(encodedHash, "$")
-	if len(parts) != 6 {
-		return false, errors.New("invalid hash format")
-	}
-
-	// Verify algorithm
-	if parts[1] != "argon2id" {
-		return false, errors.New("unsupported algorithm")
-	}
-
-	// Parse version
-	var version int
-	_, err := fmt.Sscanf(parts[2], "v=%d", &version)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse version: %w", err)
-	}
-	// Parse parameters: m=memory,t=time,p=threads
-	var memory, time, threads uint32
-	_, err = fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse parameters: %w", err)
-	}
-
-	// Decode salt
-	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
-	if err != nil {
-		return false, fmt.Errorf("failed to decode salt: %w", err)
-	}
-
-	// Decode stored hash
-	storedHash, err := base64.RawStdEncoding.DecodeString(parts[5])
-	if err != nil {
-		return false, fmt.Errorf("failed to decode hash: %w", err)
-	}
-
-	// Hash the input password with the SAME salt and parameters
-	newHash := argon2.IDKey(
-		[]byte(password),
-		salt,
-		time,
-		memory,
-		uint8(threads),
-		uint32(len(storedHash)),
-	)
-
-	// Use constant-time comparison to prevent timing attacks
-	return subtle.ConstantTimeCompare(storedHash, newHash) == 1, nil
+// VerifyPassword verifies a password against an argon2id hash (backward compatible).
+func (a *AuthMiddleware) VerifyPassword(password, encodedHash string) (bool, error) {
+	return a.passwordHasher.Verify(password, encodedHash)
 }
 
-func (s *AuthMiddleware) GenerateGuestUsername(ctx context.Context, email string) (string, error) {
+// PasswordHasher returns the password hasher for direct access.
+func (a *AuthMiddleware) PasswordHasher() PasswordHasher {
+	return a.passwordHasher
+}
+
+// =============================================================================
+// Username Generator
+// =============================================================================
+
+// GenerateGuestUsername creates a unique username from email.
+func (a *AuthMiddleware) GenerateGuestUsername(ctx context.Context, email string) (string, error) {
 	parts := strings.Split(email, "@")
 	if len(parts) < 2 {
 		return "", fmt.Errorf("invalid email format")
@@ -501,4 +485,13 @@ func (s *AuthMiddleware) GenerateGuestUsername(ctx context.Context, email string
 
 	guestUsername := fmt.Sprintf("guest_%s%d", usernamePrefix, time.Now().Unix())
 	return guestUsername, nil
+}
+
+// =============================================================================
+// Legacy Method Aliases (Backward Compatibility)
+// =============================================================================
+
+// GenerateAcessToken is an alias for GenerateAccessToken (fixes typo, backward compatible).
+func (a *AuthMiddleware) GenerateAcessToken(userId int64, userName string) (*TokenPair, error) {
+	return a.GenerateAccessToken(userId, userName)
 }

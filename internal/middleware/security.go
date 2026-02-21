@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -62,8 +64,9 @@ func SecureHeadersMiddleware(config SecurityHeadersConfig) fiber.Handler {
 		}
 
 		// Strict-Transport-Security: Force HTTPS
+		// clean-arch: Fixed bug - was using rune conversion instead of fmt.Sprintf
 		if config.HSTSMaxAge > 0 {
-			c.Set("Strict-Transport-Security", "max-age="+string(rune(config.HSTSMaxAge))+"; includeSubDomains; preload")
+			c.Set("Strict-Transport-Security", fmt.Sprintf("max-age=%d; includeSubDomains; preload", config.HSTSMaxAge))
 		}
 
 		// Content-Security-Policy: Control resource loading

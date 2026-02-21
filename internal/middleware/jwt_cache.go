@@ -11,18 +11,27 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// =============================================================================
+// JWT Cache Implementation
+// clean-arch: Implements TokenCache interface using Redis
+// =============================================================================
+
 const (
 	jwtValidKeyPrefix     = "jwt:valid:%s"
 	jwtBlacklistKeyPrefix = "jwt:blacklist:%s"
 )
 
-// JWTCache handles caching and blacklisting of JWT tokens using Redis
+// Compile-time interface compliance check
+var _ TokenCache = (*JWTCache)(nil)
+
+// JWTCache handles caching and blacklisting of JWT tokens using Redis.
+// Implements TokenCache interface.
 type JWTCache struct {
 	redis   *redis.Client
 	enabled bool
 }
 
-// NewJWTCache creates a new JWT cache instance
+// NewJWTCache creates a new JWT cache instance.
 func NewJWTCache(redisClient *redis.Client, enabled bool) *JWTCache {
 	if redisClient == nil || !enabled {
 		slog.Info("JWT caching is disabled")
@@ -36,16 +45,18 @@ func NewJWTCache(redisClient *redis.Client, enabled bool) *JWTCache {
 	}
 }
 
-// hashToken creates a SHA256 hash of the token for use as cache key
-// This prevents storing the actual token in Redis
-func (c *JWTCache) hashToken(token string) string {
-	hash := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(hash[:])
+// =============================================================================
+// TokenCache Interface Implementation
+// =============================================================================
+
+// IsEnabled returns whether caching is enabled (implements TokenCache).
+func (c *JWTCache) IsEnabled() bool {
+	return c.enabled && c.redis != nil
 }
 
-// IsBlacklisted checks if a token is blacklisted (logged out)
+// IsBlacklisted checks if a token is blacklisted (implements TokenCache).
 func (c *JWTCache) IsBlacklisted(ctx context.Context, token string) bool {
-	if !c.enabled || c.redis == nil {
+	if !c.IsEnabled() {
 		return false
 	}
 
@@ -71,10 +82,10 @@ func (c *JWTCache) IsBlacklisted(ctx context.Context, token string) bool {
 	return isBlacklisted
 }
 
-// BlacklistToken adds a token to the blacklist (for logout)
-// The token will be blacklisted until its natural expiration
+// BlacklistToken adds a token to the blacklist (implements TokenCache).
+// The token will be blacklisted until its natural expiration.
 func (c *JWTCache) BlacklistToken(ctx context.Context, token string, expiresAt time.Time) error {
-	if !c.enabled || c.redis == nil {
+	if !c.IsEnabled() {
 		slog.Warn("JWT caching is disabled, cannot blacklist token")
 		return nil
 	}
@@ -110,10 +121,10 @@ func (c *JWTCache) BlacklistToken(ctx context.Context, token string, expiresAt t
 	return nil
 }
 
-// CacheValidToken caches a validated token to avoid repeated validation
-// Stores minimal data: just the user ID and expiration
-func (c *JWTCache) CacheValidToken(ctx context.Context, token string, userID int64, expiresAt time.Time) error {
-	if !c.enabled || c.redis == nil {
+// CacheToken caches a validated token (implements TokenCache).
+// Stores minimal data: just the user ID and expiration.
+func (c *JWTCache) CacheToken(ctx context.Context, token string, userID int64, expiresAt time.Time) error {
+	if !c.IsEnabled() {
 		return nil
 	}
 
@@ -145,10 +156,10 @@ func (c *JWTCache) CacheValidToken(ctx context.Context, token string, userID int
 	return nil
 }
 
-// GetCachedToken retrieves a cached token's user ID
-// Returns 0 and false if not cached or cache miss
+// GetCachedToken retrieves a cached token's user ID (implements TokenCache).
+// Returns 0 and false if not cached or cache miss.
 func (c *JWTCache) GetCachedToken(ctx context.Context, token string) (int64, bool) {
-	if !c.enabled || c.redis == nil {
+	if !c.IsEnabled() {
 		return 0, false
 	}
 
@@ -176,10 +187,10 @@ func (c *JWTCache) GetCachedToken(ctx context.Context, token string) (int64, boo
 	return userID, true
 }
 
-// InvalidateToken removes a token from the valid cache
-// Used when token should no longer be considered valid
+// InvalidateToken removes a token from the valid cache (implements TokenCache).
+// Used when token should no longer be considered valid.
 func (c *JWTCache) InvalidateToken(ctx context.Context, token string) error {
-	if !c.enabled || c.redis == nil {
+	if !c.IsEnabled() {
 		return nil
 	}
 
@@ -202,9 +213,24 @@ func (c *JWTCache) InvalidateToken(ctx context.Context, token string) error {
 	return nil
 }
 
-// GetCacheStats returns statistics about the JWT cache
+// =============================================================================
+// Internal Methods
+// =============================================================================
+
+// hashToken creates a SHA256 hash of the token for use as cache key.
+// This prevents storing the actual token in Redis.
+func (c *JWTCache) hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
+}
+
+// =============================================================================
+// Additional Methods (Stats, etc.)
+// =============================================================================
+
+// GetCacheStats returns statistics about the JWT cache.
 func (c *JWTCache) GetCacheStats(ctx context.Context) (map[string]int64, error) {
-	if !c.enabled || c.redis == nil {
+	if !c.IsEnabled() {
 		return map[string]int64{
 			"enabled": 0,
 		}, nil
@@ -227,4 +253,13 @@ func (c *JWTCache) GetCacheStats(ctx context.Context) (map[string]int64, error) 
 		"valid_tokens":       int64(len(validKeys)),
 		"blacklisted_tokens": int64(len(blacklistKeys)),
 	}, nil
+}
+
+// =============================================================================
+// Backward Compatibility Aliases
+// =============================================================================
+
+// CacheValidToken is an alias for CacheToken (backward compatible).
+func (c *JWTCache) CacheValidToken(ctx context.Context, token string, userID int64, expiresAt time.Time) error {
+	return c.CacheToken(ctx, token, userID, expiresAt)
 }

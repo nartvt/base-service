@@ -194,6 +194,20 @@ paths:
       summary: Readiness check
       tags:
       - Health
+  /health/stats:
+    get:
+      description: Get infrastructure statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Infrastructure stats
+      tags:
+      - Health
   /metrics:
     get:
       description: Get Prometheus-compatible metrics
